@@ -12,9 +12,9 @@ import android.util.SparseArray
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.util.forEach
-import com.isens.standard.ble.Const
-import com.isens.standard.ble.ExtendedDevice
-import com.isens.standard.ble.GlucoseRecord
+import net.huray.caresens.ble.Const
+import net.huray.caresens.ble.ExtendedDevice
+import net.huray.caresens.ble.GlucoseRecord
 import net.huray.caresens.callbacks.BluetoothConnectionCallbacks
 import net.huray.caresens.callbacks.BluetoothDataCallbacks
 import net.huray.caresens.callbacks.BluetoothScanCallbacks
