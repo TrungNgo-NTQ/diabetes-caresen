@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.util.SparseArray
@@ -24,6 +26,7 @@ import net.huray.caresens.enums.ConnectState
 import net.huray.caresens.enums.DataReadState
 import net.huray.caresens.enums.GlucoseUnit
 import net.huray.caresens.enums.ScanState
+import java.lang.StringBuilder
 import java.text.SimpleDateFormat
 
 class MainActivity : AppCompatActivity() {
@@ -33,6 +36,12 @@ class MainActivity : AppCompatActivity() {
     private var mDeviceAdapter: DeviceAdapter? = null
 
     var caresensBluetoothService: CaresensBluetoothService? = null
+
+
+    private var readData = false
+    private var connected = false
+    private var result = StringBuilder()
+
     private var serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val serviceBinder = service as CaresensBluetoothService.ServiceBinder
@@ -47,17 +56,26 @@ class MainActivity : AppCompatActivity() {
                         ) {
                             when (state) {
                                 ScanState.SCANNING -> {
-                                    for(device in devices!!){
-                                        Log.d(TAG, "device name:" + device?.device?.name)
-                                        Log.d(
-                                            TAG,
-                                            "device address:" + device?.device?.address
-                                        )
-                                        mDeviceAdapter?.addDevice(device)
+                                    for (device in devices!!) {
+                                        if (device.device.name.contains("CareSens") || device.device.name.contains("meter")) {
+
+                                            Handler(Looper.getMainLooper()).postDelayed({
+                                                if (!connected) {
+                                                    Log.d("LinhBD", "Connect")
+                                                    connect(device.device)
+                                                    connected = true
+                                                }
+                                            }, 3000)
+                                        }
                                     }
                                 }
+
                                 ScanState.STOPPED -> {
-                                    Log.d(TAG, "onStop called")
+
+                                }
+
+                                else -> {
+
                                 }
                             }
 
@@ -70,30 +88,21 @@ class MainActivity : AppCompatActivity() {
                             errorMsg: String?,
                             deviceInfo: DeviceInfo?
                         ) {
-                            Log.d(TAG, "Connect Callback called: $state")
                             when (state) {
                                 ConnectState.DISCONNECTED -> {
-                                    Log.d(
-                                        TAG,
-                                        "DisConnect deviceInfo name: ${deviceInfo?.name}"
-                                    )
-                                    Log.d(
-                                        TAG,
-                                        "DisConnect deviceInfo SN: ${deviceInfo?.serialNumber}"
-                                    )
-                                    Log.d(
-                                        TAG,
-                                        "DisConnect deviceInfo Ver: ${deviceInfo?.version}"
-                                    )
-                                    Log.d(
-                                        TAG,
-                                        "DisConnect deviceInfo count: ${deviceInfo?.totalCount}"
-                                    )
+                                    connected = false
+                                    readData = false
                                 }
                                 ConnectState.CONNECTED -> {
-                                    _binding?.listviewScannedDevices?.visibility = View.GONE
-                                    _binding?.layoutDeviceInfo?.visibility = View.VISIBLE
-                                    _binding?.layoutButton?.visibility = View.VISIBLE
+                                    Handler(Looper.getMainLooper()).postDelayed({
+                                        if (!readData) {
+                                            requestAllRecords()
+                                            readData = true
+                                        }
+                                    }, 3000)
+                                }
+                                else -> {
+
                                 }
                             }
                         }
@@ -108,53 +117,34 @@ class MainActivity : AppCompatActivity() {
                         ) {
                             when (dataReadState) {
                                 DataReadState.GlUCOSE_RECORD_READ_COMPLETE -> {
-                                    _binding?.txtResult?.movementMethod = ScrollingMovementMethod()
-                                    _binding?.txtResult?.scrollTo(0, 0)
-                                    _binding?.txtResult?.text = ""
-                                    _binding?.txtResult?.visibility = View.VISIBLE
-                                    if (glucoseRecords == null || glucoseRecords.size() <= 0) {
-                                        _binding?.txtResult?.append("No data downloaded.")
-                                        return
-                                    }
-                                    _binding?.listviewScannedDevices?.visibility = View.GONE
-                                    _binding?.btnBack?.visibility = View.VISIBLE
-                                    _binding?.layoutButton?.visibility = View.GONE
+                                    Log.d("LinhBD", "glucoseRecords size: ${glucoseRecords?.size()}")
 
-                                    glucoseRecords.forEach { key, value ->
+                                    glucoseRecords?.forEach { key, value ->
                                         if (value.flag_ketone == 1) {
-                                            _binding?.txtResult?.append(
-                                                """### sequence: ${value.sequenceNumber}, ketone: ${value.glucoseData / Const.KetoneMultiplier}mmol/L, date: ${
-                                                    getDate(
-                                                        value.time
-                                                    )
-                                                }, timeoffset: ${value.timeoffset}""".trimIndent()
+                                            result.append(
+                                                value.glucoseData.toString()
                                             )
                                         } else {
-                                            _binding?.txtResult?.append(
-                                                """### sequence: ${value.sequenceNumber}, glucose: ${value.glucoseData}${
-                                                    GlucoseUnit.getValue(
-                                                        caresensBluetoothService?.getGlucoseUnit()
-                                                    )
-                                                }, date: ${
-                                                    getDate(
-                                                        value.time
-                                                    )
-                                                }, timeoffset: ${value.timeoffset}""".trimIndent()
+                                            result.append(
+                                                value.glucoseData.toString()
                                             )
                                         }
                                     }
 
-                                    Log.d(TAG, "glucose Record: $glucoseRecords")
+                                    Log.d("LinhBD", result.toString())
                                 }
                                 DataReadState.DEVICE_INFO_READ_COMPLETE -> {
-                                    _binding?.txtDeviceName?.text = deviceInfo?.name
+                                    /*_binding?.txtDeviceName?.text = deviceInfo?.name
                                     _binding?.txtSerialNum?.text = deviceInfo?.serialNumber
                                     _binding?.txtSoftwareVersion?.text =
                                         deviceInfo?.version.toString()
                                     _binding?.txtTotalCount?.text =
-                                        deviceInfo?.totalCount.toString()
+                                        deviceInfo?.totalCount.toString()*/
+
+                                    Log.d("LinhBD", result.toString())
                                 }
                                 else -> {
+                                    Log.d("LinhBD", "SomeThingWrong")
                                 }
                             }
 
@@ -163,6 +153,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                 )
+                setCheckAutoConnect(false)
             }
         }
 

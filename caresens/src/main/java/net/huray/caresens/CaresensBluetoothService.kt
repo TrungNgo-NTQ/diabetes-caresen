@@ -66,6 +66,7 @@ open class CaresensBluetoothService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
             val extraData = intent.getStringExtra(Const.INTENT_BLE_EXTRA_DATA)
+            Log.d("LinhBD", action.toString())
             when (action) {
                 Const.INTENT_BLE_TOTAL_COUNT -> {
                     Log.d(TAG,"INTENT_BLE_TOTAL_COUNT")
@@ -301,11 +302,6 @@ open class CaresensBluetoothService : Service() {
             try {
                 if (mBluetoothAdapter!!.state == BluetoothAdapter.STATE_ON) {
                     if (mScanCallback == null) initCallback()
-                    val filters: List<ScanFilter> = ArrayList()
-                    val settings = ScanSettings.Builder()
-                        .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                        .setReportDelay(0)
-                        .build()
                     if (hasPermissions()
                     ) {
                         mBluetoothAdapter!!.bluetoothLeScanner.flushPendingScanResults(
@@ -313,8 +309,6 @@ open class CaresensBluetoothService : Service() {
                         )
                         mBluetoothAdapter!!.bluetoothLeScanner.stopScan(mScanCallback)
                         mBluetoothAdapter!!.bluetoothLeScanner.startScan(
-                            filters,
-                            settings,
                             mScanCallback
                         )
                     }
@@ -468,8 +462,13 @@ open class CaresensBluetoothService : Service() {
                 override fun onScanResult(callbackType: Int, result: ScanResult?) {
                     super.onScanResult(callbackType, result)
                     if (result != null) {
+
                         try {
-                            if (ScannerServiceParser.decodeDeviceAdvData(result.scanRecord!!.bytes)) {
+                            if (result.device.name != null) {
+                                if (result.device.name != null) {
+                                    Log.d("LinhBD", result.device.name)
+                                }
+
                                 if (result.device.bondState == BluetoothDevice.BOND_BONDED) {
                                     if (mAutoConnect) {
                                         // CONNECT DEVICE

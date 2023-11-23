@@ -31,6 +31,7 @@ import android.os.IBinder;
 import android.util.Log;
 import android.util.SparseArray;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 
@@ -200,6 +201,13 @@ public class GlucoseBleService extends Service {
                         mGlucoseContextCharacteristic = service.getCharacteristic(Const.BLE_CHAR_GLUCOSE_CONTEXT);   //2A34
                         // Time Synchronization for some old meters
                         mRACPCharacteristic = service.getCharacteristic(Const.BLE_CHAR_RACP);   //2A52
+
+
+                        //logic giong ios
+                        enableGlucoseContextNotification(gatt);
+                        /*enableGlucoseMeasurementNotification(gatt);
+                        //enableRecordAccessControlPointNotification(gatt);
+                        enableRecordAccessControlPointIndication(gatt);*/
                     }
                     else if (Const.BLE_SERVICE_DEVICE_INFO.equals(service.getUuid())) {    // Device Info Service // 180A
                         mDeviceSerialCharacteristic = service.getCharacteristic(Const.BLE_CHAR_DEVICE_INFO_SERIALNO);  //2A25
@@ -266,44 +274,29 @@ public class GlucoseBleService extends Service {
 
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                if (Const.BLE_CHAR_GLUCOSE_MEASUREMENT.equals(descriptor.getCharacteristic().getUuid())) { //2A18
-                    // ###8. ENABLE GLUCOSE CONTEXT
-                    enableGlucoseContextNotification(gatt);
-                }
-                if (Const.BLE_CHAR_GLUCOSE_CONTEXT.equals(descriptor.getCharacteristic().getUuid())) { //2A34
-                    if (mCustomTimeCharacteristic != null) {
-                        // ###9. ENABLE TIME SYNC
-                        enableTimeSyncNotification(gatt);
-                    }
-
-                    if (Util.getInstance(getApplicationContext()).getPreferenceBool(Const.IS_AUTO_DOWNLOAD) == false) {  //If auto-download option not checked, do not proceed with time sync & data download.
-                        broadcastUpdate(Const.INTENT_BLE_CHAR_GLUCOSE_CONTEXT, "");
-                        return;
-                    }
-
-                    if (mCustomTimeCharacteristic == null) { //TimeSync for old meters time characteristic is null
-                        // ###10. TIME SYNC
-                        requestTimeSyncForOldMeter();
-                    }
-                }
-                if (Const.BLE_CHAR_RACP.equals(descriptor.getCharacteristic().getUuid())) { //2A52
-                    // ###7. ENABLE GLUCOSE MEASUREMENT
-                    enableGlucoseMeasurementNotification(gatt);
-                }
-                if (Const.BLE_CHAR_CUSTOM_TIME.equals(descriptor.getCharacteristic().getUuid()) ||
-                mCustomTimeCharacteristic.getUuid().equals(Const.BLE_CHAR_CUSTOM_TIME_NEW)) { //FFF1, A3BC
-                    if (Util.getInstance(getApplicationContext()).getPreferenceBool(Const.IS_AUTO_DOWNLOAD) == false) { //If auto-download option not checked, do not proceed with time sync & data download.
-                        return;
-                    }
-                    // ###10. TIME SYNC
-                    requestCustomTimeSync();
-                }
-            } else if (status == BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION) {
-                if (gatt.getDevice().getBondState() != BluetoothDevice.BOND_NONE) {
-                    broadcastUpdate(Const.INTENT_BLE_ERROR, getString(R.string.ERROR_AUTH_ERROR_WHILE_BONDED) + " (" + status + ")");
+            Log.d("LinhBD", "Descriptor: " + descriptor.getCharacteristic().getUuid().toString());
+            if(descriptor.getCharacteristic().getUuid().equals(Const.BLE_CHAR_GLUCOSE_CONTEXT)){
+                enableGlucoseMeasurementNotification(gatt);
+            } else if(descriptor.getCharacteristic().getUuid().equals(Const.BLE_CHAR_GLUCOSE_MEASUREMENT)){
+                enableRecordAccessControlPointIndication(gatt);
+            } else if(descriptor.getCharacteristic().getUuid().equals(Const.BLE_CHAR_RACP)){
+                try {
+                    Thread.sleep(200);
+                    byte[] data = new byte[2];
+                    data[0] = 0x01; // Report Stored records
+                    data[1] = 0x01; // All records
+                    mRACPCharacteristic.setValue(data);
+                    gatt.writeCharacteristic(mRACPCharacteristic);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
             }
+        }
+
+        @Override
+        public void onCharacteristicChanged(@NonNull BluetoothGatt gatt, @NonNull BluetoothGattCharacteristic characteristic, @NonNull byte[] value) {
+            super.onCharacteristicChanged(gatt, characteristic, value);
+            Log.d("LinhBD", value.length + "");
         }
 
         @Override
@@ -665,7 +658,7 @@ public class GlucoseBleService extends Service {
         stopScan();
 
         //
-        if (Util.getInstance(getApplicationContext()).getPreferenceBool(Const.IS_AUTO_DOWNLOAD)) {
+        /*if (Util.getInstance(getApplicationContext()).getPreferenceBool(Const.IS_AUTO_DOWNLOAD)) {
             // make service to foreground(attached with notification) to keep it alive regardless of app status.
             int noti_id = 1;
             startForeground(noti_id, mNoti.build());  //
@@ -673,7 +666,7 @@ public class GlucoseBleService extends Service {
             // stop foreground of this service because the app is foreground.
             stopForeground(true);
             //mNotiManager.cancelAll();
-        }
+        }*/
 
         // periodic means not always (1 scan per 15s)
         // periodic scanning becomes true when the service goes background
@@ -900,6 +893,16 @@ public class GlucoseBleService extends Service {
         gatt.setCharacteristicNotification(mRACPCharacteristic, true);
         final BluetoothGattDescriptor descriptor = mRACPCharacteristic.getDescriptor(Const.BLE_DESCRIPTOR);
         descriptor.setValue(BluetoothGattDescriptor.ENABLE_INDICATION_VALUE);
+        gatt.writeDescriptor(descriptor);
+    }
+
+    private void enableRecordAccessControlPointNotification(final BluetoothGatt gatt) {
+        if (mRACPCharacteristic == null) {
+            return;
+        }
+        gatt.setCharacteristicNotification(mRACPCharacteristic, true);
+        final BluetoothGattDescriptor descriptor = mRACPCharacteristic.getDescriptor(Const.BLE_DESCRIPTOR);
+        descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
         gatt.writeDescriptor(descriptor);
     }
 
