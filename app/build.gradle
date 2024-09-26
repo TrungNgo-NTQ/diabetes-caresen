@@ -1,15 +1,13 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
-    id 'maven-publish'
 }
 
 android {
     compileSdk 31
 
     defaultConfig {
-        applicationId "net.huray.caresens"
-        minSdk 21
+        minSdk 24
         targetSdk 31
         versionCode 1
         versionName "1.0"
@@ -41,48 +39,6 @@ dependencies {
     implementation 'com.google.android.material:material:1.5.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
     implementation 'gun0912.ted:tedpermission:2.2.3'
-    implementation files('libs/caresensOriginalSDK.jar')
-    //implementation project(':caresensOriginalSdk')
+    implementation project(path: ':caresens')
 }
 
-def getGroupId = { ->
-    return "com.github.TrungNgo-NTQ" // Replace with version Name
-}
-
-def getArtifactId = { ->
-    return "diabetes-caresen" // Replace with library name ID
-}
-
-def getVersionName = { ->
-    return "0.0.1" // Replace with library name ID
-}
-
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
-                from components.release
-                groupId = getGroupId
-                artifactId = getArtifactId
-                version = getVersionName
-                artifact  ("$buildDir/outputs/aar/${getArtifactId()}-release.aar")
-            }
-        }
-    }
-}
-//afterEvaluate {
-//    publishing {
-//        publications {
-//            // Creates a Maven publication called "release".
-//            release(MavenPublication) {
-//                // Applies the component for the release build variant.
-//                from components.release
-//
-//                // You can then customize attributes of the publication as shown below.
-//                groupId = 'com.github.huraypositive'
-//                artifactId = 'caresens'
-//                version = '1.0.0'
-//            }
-//        }
-//    }
-//}
